@@ -9,7 +9,10 @@ import gc
 import sys
 import time
 import traceback
-import argparse
+
+# https://is.gd/NKCK2n , main way of storing flags in this module
+import argparse 
+
 import datetime
 
 import numpy as np
@@ -22,8 +25,13 @@ from torch.optim.lr_scheduler import StepLR
 
 from tensorboardX import SummaryWriter
 
+# https://www.geeksforgeeks.org/?p=250969, concept of a flag
+# https://is.gd/FHyydV , flags us a way to manage command line options
+# app seems like another way to run Python scripts (other than usual >> python3 scipt.py)
+# QS: if we already have argprase, why still use flags from absl? > app & flags not used in this module.
 from absl import flags
 from absl import app
+
 from tqdm import tqdm
 
 from alphastarmini.core.arch.arch_model import ArchModel
@@ -44,6 +52,7 @@ import param as P
 
 __author__ = "Ruo-Ze Liu"
 
+# Selector to print debug messages
 debug = True
 
 parser = argparse.ArgumentParser()
@@ -57,7 +66,7 @@ parser.add_argument('--num_workers', type=int, default=2, help='')
 
 args = parser.parse_args()
 
-# training paramerters
+# training parameters
 if SCHP.map_name == 'Simple64':
     PATH = args.path1
 elif SCHP.map_name == 'AbyssalReef':
