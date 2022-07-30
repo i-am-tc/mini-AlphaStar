@@ -55,6 +55,9 @@ __author__ = "Ruo-Ze Liu"
 # Selector to print debug messages
 debug = True
 
+###############################################################
+
+# Prep up arguments for control of training process
 parser = argparse.ArgumentParser()
 parser.add_argument("-p1", "--path1", default="./data/replay_data_tensor_new_small/", help="The path where data stored")
 parser.add_argument("-p2", "--path2", default="./data/replay_data_tensor_new_small_AR/", help="The path where data stored")
@@ -62,11 +65,14 @@ parser.add_argument("-m", "--model", choices=["sl", "rl"], default="sl", help="C
 parser.add_argument("-r", "--restore", action="store_true", default=False, help="whether to restore model or not")
 parser.add_argument("-c", "--clip", action="store_true", default=False, help="whether to use clipping")
 parser.add_argument('--num_workers', type=int, default=2, help='')
-
-
 args = parser.parse_args()
 
-# training parameters
+###############################################################
+
+# Check map name and init PATH accordingly to correct path where replays are stored.
+# https://sss1.bnu.edu.cn/~pguo/pdf/2018/P054.pdf
+    # section V, brief explanation of Simple64 and other simple maps.
+# https://is.gd/7FlW0d on AbyssalReef 
 if SCHP.map_name == 'Simple64':
     PATH = args.path1
 elif SCHP.map_name == 'AbyssalReef':
@@ -136,14 +142,17 @@ GAMMA = 0.2
 torch.manual_seed(SLTHP.seed)
 np.random.seed(SLTHP.seed)
 
+###############################################################
 
 def getReplayData(path, replay_files, from_index=0, end_index=None):
     td_list = []
     for i, replay_file in enumerate(tqdm(replay_files)):
         try:
             replay_path = path + replay_file
+            # TOOD: useless if statement
             print('replay_path:', replay_path) if 1 else None
 
+            # TODO: what is the point of do_write here? if there's no point for do_write, then what's the point of from and end index? 
             do_write = False
             if i >= from_index:
                 if end_index is None:
@@ -168,7 +177,12 @@ def getReplayData(path, replay_files, from_index=0, end_index=None):
 
 def main_worker(device):
     print('==> Making model..')
+
+    # Instantiate the model
+    # TODO: must follow this trail
     net = ArchModel()
+
+    # Seems like a way to set up net to carry on training where we left off in case the training was interrupted.
     checkpoint = None
     if RESTORE:
         if LOAD_STATE_DICT:
@@ -183,8 +197,13 @@ def main_worker(device):
             # use checkpoint to restore
             checkpoint = torch.load(RESTORE_PATH_TRAIN, map_location=device)
             net.load_state_dict(checkpoint['model'], strict=False)
+    
+    # Assign a GPU to neural net. 
     net = net.to(device)
 
+    ###############################################################
+
+    # https://is.gd/HojQuq, compute number of params that requires gradient
     num_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print('The number of parameters of model is', num_params)
 
@@ -193,6 +212,9 @@ def main_worker(device):
     optimizer, scheduler = None, None
     batch_iter, epoch = 0, 0
 
+    # Depending on how we do restoration, optimizer and scheduler are setup differently.
+    # https://is.gd/LI2G4D : concept of an optimizer in PyTorch, stochastic grad desc is one of few optimizers supported by PyTorch
+    # https://is.gd/W5WPKG : how to adjust learning rate over epochs
     if RESTORE and LOAD_CHECKPOINT:
         # use checkpoint to restore other
         optimizer = Adam(net.parameters())
@@ -212,25 +234,33 @@ def main_worker(device):
     else:
         optimizer = Adam(net.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         scheduler = StepLR(optimizer, step_size=STEP_SIZE, gamma=GAMMA)
+    
+    ###############################################################
 
     print('==> Preparing data..')
 
+    # Print out all the replay files used for this training, then sort
     replay_files = os.listdir(PATH)
     print('length of replay_files:', len(replay_files)) if debug else None
+
+    # Sorting is needed here because of do_write in getReplayData. 
     replay_files.sort()
 
+    # For each transformed replay file, we load (into PyTorch) features & label, append and output a list containing elements of ReplayTensorDataset
     train_list = getReplayData(PATH, replay_files, from_index=TRAIN_FROM, end_index=TRAIN_FROM + TRAIN_NUM)
     val_list = getReplayData(PATH, replay_files, from_index=VAL_FROM, end_index=VAL_FROM + VAL_NUM)
 
     print('len(train_list)', len(train_list)) if debug else None
     print('len(val_list)', len(val_list)) if debug else None
 
+    # https://is.gd/CGz1uw : 
     train_set = ConcatDataset(train_list)
     val_set = ConcatDataset(val_list)
 
     print('len(train_set)', len(train_set)) if debug else None
     print('len(val_set)', len(val_set)) if debug else None
 
+    # https://is.gd/qthdki : 
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, 
                               num_workers=NUM_WORKERS, pin_memory=False)
 
@@ -239,6 +269,8 @@ def main_worker(device):
 
     print('len(train_loader)', len(train_loader)) if debug else None
     print('len(val_loader)', len(val_loader)) if debug else None
+
+    ###############################################################
 
     train(net, optimizer, scheduler, train_set, train_loader, device, 
           val_set, batch_iter, epoch, val_loader)
