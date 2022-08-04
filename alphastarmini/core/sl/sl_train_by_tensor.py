@@ -331,7 +331,7 @@ def train(net, optimizer, scheduler, train_set, train_loader, device,
             # https://is.gd/IBmIEv : compute dloss / dparameter
             loss.backward() 
 
-            # https://is.gd/IBmIEv : update parameter with learning rate & dloss / dparameter
+            # https://is.gd/IBmIEv : update parameters with learning rate & dloss / dparameter
             optimizer.step()
 
             # add a grad clip
@@ -372,11 +372,13 @@ def train(net, optimizer, scheduler, train_set, train_loader, device,
                   selected_units_type_right, selected_units_num_right, target_unit_accuracy,
                   batch_iter)
 
+            # Collect garbage
             gc.collect()
 
             print('Batch/Epoch: [{}/{}]| loss: {:.3f} | acc: {:.3f} | batch time: {:.3f}s '.format(
                 batch_iter, epoch, loss_value, action_accuracy, batch_time))
 
+        # Save progress to continue if server is shut down
         if SAVE_STATE_DICT:
             save_path = SAVE_PATH + ".pth"
             print('Save model state_dict to', save_path)
@@ -402,8 +404,12 @@ def train(net, optimizer, scheduler, train_set, train_loader, device,
             print('Save model checkpoint to', save_path)
             torch.save(save_dict, save_path)
 
+        # Validation against test set & agent's accuracy vis-a-vis human.
+        # Rmb that SL phase in Alphastar attempts to imitate human players.
+        # Looks like it imitates everything, including moving of camera
         if True:
             print('eval begin')
+            # https://is.gd/S6kNLZ : eval() is a built in Python method
             val_loss, val_acc = eval(net, val_set, val_loader, device)
             print('eval end')
 
@@ -434,10 +440,13 @@ def train(net, optimizer, scheduler, train_set, train_loader, device,
 
             del val_loss, val_acc
 
+        # Collect more garbage.
         gc.collect()
 
+        # Adjust learning rate.
         scheduler.step()
 
+    # How long did training take? 
     elapse_time = time.time() - epoch_start
     elapse_time = datetime.timedelta(seconds=elapse_time)
     print("Training time {}".format(elapse_time))
