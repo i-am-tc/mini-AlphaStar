@@ -1,0 +1,5 @@
+1 Aug 2022
+
+This implementation of AlphaStar does not include statistic z. 
+statistic z is said to be used to "condition" policy in both SL & RL in the original paper. 
+Pseudo code from Deepmind indicate that statistic z is used to compute loss, in both RL & SL
