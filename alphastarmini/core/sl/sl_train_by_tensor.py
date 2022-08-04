@@ -281,29 +281,41 @@ def main_worker(device):
 def train(net, optimizer, scheduler, train_set, train_loader, device, 
           val_set, batch_iter, epoch, val_loader=None):
 
+    # Prep for logging and visualization so we can know when things go wrong.
     now = datetime.datetime.now()
     summary_path = "./log/" + now.strftime("%Y%m%d-%H%M%S") + "/"
     writer = SummaryWriter(summary_path)
 
+    # Ready paths so we can save the model when trg is done.
     time_str = time.strftime("%y-%m-%d_%H-%M-%S", time.localtime())
     SAVE_PATH = os.path.join(MODEL_PATH, MODEL + "_" + time_str)
     SAVE_PATH_TRAIN = os.path.join(MODEL_PATH_TRAIN, MODEL + "_" + time_str)
 
+    # Time 1st epoch startt
     epoch_start = time.time()
 
     for ep in range(NUM_EPOCHS):
         loss_sum = 0
         epoch += 1 
 
-        # put model in train mode
+        # Put model in train mode
+        # https://is.gd/ldBRUQ
         net.train()
+
+        # For each batch's feature and lable, iterating through data loader
+        # https://is.gd/PfQ5ml
+        # Main training loop, simpler e.g. https://is.gd/ftd0zH to understand what is going on here
         for batch_idx, (features, labels) in enumerate(train_loader):
             start = time.time()
 
+            # https://is.gd/AAvMZ3 , converting our data to a GPU or CPU tensor, depending on what's set in test()
             feature_tensor = features.to(device).float()
             labels_tensor = labels.to(device).float()
-            del features, labels
+            del features, labels # https://is.gd/a6m08z
 
+            # Get loss related numbers
+            # TODO: what does loss_list & acc_num_list contain?
+            # TODO: why is get_sl_loss_for_tensor used here from sl_loss_multi_gpu, rather than from the non multi gpu sl_loss?
             loss, loss_list, \
                 acc_num_list = Loss.get_sl_loss_for_tensor(feature_tensor, 
                                                            labels_tensor, net, 
@@ -313,8 +325,13 @@ def train(net, optimizer, scheduler, train_set, train_loader, device,
                                                            train=True)
             del feature_tensor, labels_tensor
 
+            # https://is.gd/ftd0zH , https://is.gd/WT2s4I : reasons why we zero out gradient.
             optimizer.zero_grad()
+
+            # https://is.gd/IBmIEv : compute dloss / dparameter
             loss.backward() 
+
+            # https://is.gd/IBmIEv : update parameter with learning rate & dloss / dparameter
             optimizer.step()
 
             # add a grad clip
@@ -322,11 +339,13 @@ def train(net, optimizer, scheduler, train_set, train_loader, device,
                 parameters = [p for p in net.parameters() if p is not None and p.requires_grad]
                 torch.nn.utils.clip_grad_norm_(parameters, CLIP_VALUE)
 
+            # TODO: simplify
             loss_value = float(loss.item())
-
             loss_sum += loss_value
             del loss
 
+            # Computing some accuracy statistics.
+            # Without knowing what acc_num_list contain, hard to make out meaning 
             action_accuracy = acc_num_list[0] / (acc_num_list[1] + 1e-9)
             move_camera_accuracy = acc_num_list[2] / (acc_num_list[3] + 1e-9)
             non_camera_accuracy = acc_num_list[4] / (acc_num_list[5] + 1e-9)
@@ -346,6 +365,7 @@ def train(net, optimizer, scheduler, train_set, train_loader, device,
             batch_iter += 1
             print('batch_iter', batch_iter)
 
+            # Write to tensorboard
             write(writer, loss_value, loss_list, action_accuracy, 
                   move_camera_accuracy, non_camera_accuracy, short_important_accuracy,
                   location_accuracy, location_distance, selected_units_accuracy,
