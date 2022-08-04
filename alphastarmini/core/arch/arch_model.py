@@ -47,10 +47,16 @@ class ArchModel(nn.Module):
 
     def __init__(self):
         super(ArchModel, self).__init__()
+
+        # TODO: what are these encoders?
         self.scalar_encoder = ScalarEncoder()
         self.entity_encoder = EntityEncoder()
         self.spatial_encoder = SpatialEncoder()
+
+        # TODO : is this referring to the LSTM?
         self.core = Core()
+
+        # TODO: each head represents?
         self.action_type_head = ActionTypeHead()
         self.delay_head = DelayHead()
         self.queue_head = QueueHead()
